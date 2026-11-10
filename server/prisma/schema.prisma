@@ -1,0 +1,174 @@
+/// Schéma de la base de données de gestion locative R. Houphouet.
+/// Toutes les tables et colonnes sont nommées en français.
+
+generator client {
+  provider               = "prisma-client"
+  output                 = "../src/generated/prisma"
+  runtime                = "nodejs"
+  moduleFormat           = "cjs"
+  generatedFileExtension = "ts"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+/// Statut d'un appartement dans l'immeuble
+enum StatutAppartement {
+  LIBRE
+  OCCUPE
+  EN_TRAVAUX
+}
+
+/// Moyens de paiement acceptés
+enum ModePaiement {
+  ESPECES
+  VIREMENT
+  MOBILE_MONEY
+  CARTE
+}
+
+/// État d'un loyer pour un mois donné
+enum StatutLoyer {
+  EN_ATTENTE
+  PARTIEL
+  PAYE
+  EN_RETARD
+}
+
+/// Catégories de charges et dépenses
+enum CategorieCharge {
+  ENTRETIEN
+  REPARATION
+  EAU_ELECTRICITE
+  TAXE_IMPOT
+  ASSURANCE
+  AUTRE
+}
+
+/// Nature d'une notification
+enum TypeNotification {
+  LOYER
+  PAIEMENT
+  MESSAGE
+  SYSTEME
+}
+
+/// Personne à qui la notification est destinée
+enum DestinataireNotification {
+  ADMIN
+  LOCATAIRE
+}
+
+/// Auteur d'un message de la messagerie
+enum ExpediteurMessage {
+  ADMIN
+  LOCATAIRE
+}
+
+/// Appartement de l'immeuble
+model Appartement {
+  id           String            @id @default(cuid())
+  numero       String            @unique
+  designation  String?
+  loyerMensuel Int
+  nombrePieces Int               @default(1)
+  statut       StatutAppartement @default(LIBRE)
+  locataires   Locataire[]
+  charges      Charge[]
+  creeLe       DateTime          @default(now())
+  modifieLe    DateTime          @updatedAt
+
+  @@map("appartements")
+}
+
+/// Locataire rattaché à un appartement
+model Locataire {
+  id            String         @id @default(cuid())
+  nom           String
+  telephone     String         @unique
+  email         String?        @unique
+  loyerMensuel  Int
+  caution       Int            @default(0)
+  dateEntree    DateTime
+  actif         Boolean        @default(true)
+  appartementId String?
+  appartement   Appartement?   @relation(fields: [appartementId], references: [id], onDelete: SetNull)
+  loyers        Loyer[]
+  messages      Message[]
+  notifications Notification[]
+  creeLe        DateTime       @default(now())
+  modifieLe     DateTime       @updatedAt
+
+  @@index([actif])
+  @@map("locataires")
+}
+
+/// Loyer d'un locataire pour un mois précis
+model Loyer {
+  id           String       @id @default(cuid())
+  locataireId  String
+  locataire    Locataire    @relation(fields: [locataireId], references: [id], onDelete: Cascade)
+  montantDu    Int
+  montantRecu  Int          @default(0)
+  mois         String
+  dateEcheance DateTime
+  datePaiement DateTime?
+  modePaiement ModePaiement @default(ESPECES)
+  statut       StatutLoyer  @default(EN_ATTENTE)
+  reference    String?      @unique
+  creeLe       DateTime     @default(now())
+  modifieLe    DateTime     @updatedAt
+
+  @@unique([locataireId, mois])
+  @@index([mois])
+  @@index([statut])
+  @@map("loyers")
+}
+
+/// Charge ou dépense liée à un appartement
+model Charge {
+  id            String          @id @default(cuid())
+  libelle       String
+  categorie     CategorieCharge @default(AUTRE)
+  montant       Int
+  date          DateTime
+  appartementId String?
+  appartement   Appartement?    @relation(fields: [appartementId], references: [id], onDelete: SetNull)
+  creeLe        DateTime        @default(now())
+
+  @@index([date])
+  @@map("charges")
+}
+
+/// Notification destinée à l'administration ou à un locataire
+model Notification {
+  id           String                  @id @default(cuid())
+  titre        String
+  contenu      String
+  type         TypeNotification        @default(SYSTEME)
+  destinataire DestinataireNotification @default(ADMIN)
+  lu           Boolean                 @default(false)
+  lien         String?
+  locataireId  String?
+  locataire    Locataire?              @relation(fields: [locataireId], references: [id], onDelete: Cascade)
+  creeLe       DateTime                @default(now())
+
+  @@index([destinataire, lu])
+  @@index([locataireId])
+  @@map("notifications")
+}
+
+/// Message échangé entre un locataire et l'administration
+model Message {
+  id          String            @id @default(cuid())
+  locataireId String
+  locataire   Locataire         @relation(fields: [locataireId], references: [id], onDelete: Cascade)
+  expediteur  ExpediteurMessage
+  contenu     String
+  lu          Boolean           @default(false)
+  creeLe      DateTime          @default(now())
+
+  @@index([locataireId, creeLe])
+  @@map("messages")
+}
