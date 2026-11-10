@@ -21,10 +21,7 @@ import type {
 } from '../types';
 import { effacerSession, lireJeton } from './session';
 
-//  Correction de la ligne 21 pour forcer l'adresse de Render en production
-const URL_API = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
-  ? 'http://localhost:5000/api'
-  : 'https://onrender.com';
+const URL_API = import.meta.env.VITE_API_URL ?? 'http://localhost:5000/api';
 
 export class ErreurApi extends Error {
   readonly statut: number;
