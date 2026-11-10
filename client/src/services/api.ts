@@ -21,7 +21,14 @@ import type {
 } from '../types';
 import { effacerSession, lireJeton } from './session';
 
-const URL_API = import.meta.env.VITE_API_URL ?? 'http://localhost:5000/api';
+// VITE_API_URL peut être fourni avec ou sans le préfixe /api.
+function normaliserUrlApi(valeur: string): string {
+  const base = valeur.trim().replace(/\/+$/, '');
+  return base.endsWith('/api') ? base : `${base}/api`;
+}
+
+const urlConfiguree = (import.meta.env.VITE_API_URL ?? '').trim();
+const URL_API = normaliserUrlApi(urlConfiguree || 'http://localhost:5000/api');
 
 export class ErreurApi extends Error {
   readonly statut: number;
