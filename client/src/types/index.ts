@@ -11,6 +11,7 @@ export type CategorieCharge =
 export type TypeNotification = 'LOYER' | 'PAIEMENT' | 'MESSAGE' | 'SYSTEME';
 export type DestinataireNotification = 'ADMIN' | 'LOCATAIRE';
 export type ExpediteurMessage = 'ADMIN' | 'LOCATAIRE';
+export type StatutContrat = 'ACTIF' | 'TERMINE' | 'RESILIE';
 
 export interface Appartement {
   id: string;
@@ -186,6 +187,60 @@ export interface DonneesPaiement {
   montantRecu: number;
   modePaiement?: ModePaiement;
   datePaiement?: string;
+}
+
+export interface Paiement {
+  id: string;
+  locataireId: string;
+  locataire?: Locataire;
+  loyerId: string;
+  loyer?: Loyer;
+  montant: number;
+  modePaiement: ModePaiement;
+  datePaiement: string;
+  reference: string;
+  note: string | null;
+  creeLe: string;
+}
+
+export interface Contrat {
+  id: string;
+  numero: string;
+  locataireId: string;
+  locataire?: Locataire;
+  appartementId: string | null;
+  appartement?: Appartement | null;
+  dateDebut: string;
+  dateFin: string | null;
+  loyerMensuel: number;
+  caution: number;
+  chargesMensuelles: number;
+  statut: StatutContrat;
+  clauses: string | null;
+  creeLe: string;
+  modifieLe: string;
+}
+
+export interface DonneesPaiementLocataire {
+  locataireId: string;
+  mois: string;
+  montant: number;
+  montantDu?: number;
+  modePaiement?: ModePaiement;
+  datePaiement?: string;
+  note?: string;
+}
+
+export interface DonneesContrat {
+  locataireId: string;
+  appartementId?: string;
+  dateDebut?: string;
+  dateFin?: string;
+  loyerMensuel?: number;
+  caution?: number;
+  chargesMensuelles?: number;
+  statut?: StatutContrat;
+  clauses?: string;
 }
 
 export interface DonneesCharge {

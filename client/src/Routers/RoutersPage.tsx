@@ -4,11 +4,13 @@ import LayoutsPage from '../Layouts/LayoutsPage';
 import Apparts from '../Pages/Apparts';
 import Charges from '../Pages/Charges';
 import Connexion from '../Pages/Connexion';
+import Contrats from '../Pages/Contrats';
 import Dashboard from '../Pages/Dashboard';
 import Locataires from '../Pages/Locataires';
 import Loyers from '../Pages/Loyers';
 import Messagerie from '../Pages/Messagerie';
 import Notifications from '../Pages/Notifications';
+import Paiements from '../Pages/Paiements';
 import Rapports from '../Pages/Rapports';
 
 const RoutersPage = () => {
@@ -22,7 +24,9 @@ const RoutersPage = () => {
             <Route path="/" element={<Dashboard />} />
             <Route path="/Locataires" element={<Locataires />} />
             <Route path="/Apparts" element={<Apparts />} />
+            <Route path="/Contrats" element={<Contrats />} />
             <Route path="/Loyers" element={<Loyers />} />
+            <Route path="/Paiements" element={<Paiements />} />
             <Route path="/Charges" element={<Charges />} />
             <Route path="/Rapports" element={<Rapports />} />
             <Route path="/Notifications" element={<Notifications />} />

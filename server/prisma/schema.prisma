@@ -66,6 +66,13 @@ enum ExpediteurMessage {
   LOCATAIRE
 }
 
+/// État d'un contrat de location
+enum StatutContrat {
+  ACTIF
+  TERMINE
+  RESILIE
+}
+
 /// Appartement de l'immeuble
 model Appartement {
   id           String            @id @default(cuid())
@@ -76,6 +83,7 @@ model Appartement {
   statut       StatutAppartement @default(LIBRE)
   locataires   Locataire[]
   charges      Charge[]
+  contrats     Contrat[]
   creeLe       DateTime          @default(now())
   modifieLe    DateTime          @updatedAt
 
@@ -97,6 +105,8 @@ model Locataire {
   loyers        Loyer[]
   messages      Message[]
   notifications Notification[]
+  contrats      Contrat[]
+  paiements     Paiement[]
   creeLe        DateTime       @default(now())
   modifieLe     DateTime       @updatedAt
 
@@ -117,6 +127,7 @@ model Loyer {
   modePaiement ModePaiement @default(ESPECES)
   statut       StatutLoyer  @default(EN_ATTENTE)
   reference    String?      @unique
+  paiements    Paiement[]
   creeLe       DateTime     @default(now())
   modifieLe    DateTime     @updatedAt
 
@@ -171,4 +182,45 @@ model Message {
 
   @@index([locataireId, creeLe])
   @@map("messages")
+}
+
+/// Versement enregistré au titre d'un loyer
+model Paiement {
+  id           String       @id @default(cuid())
+  locataireId  String
+  locataire    Locataire    @relation(fields: [locataireId], references: [id], onDelete: Cascade)
+  loyerId      String
+  loyer        Loyer        @relation(fields: [loyerId], references: [id], onDelete: Cascade)
+  montant      Int
+  modePaiement ModePaiement @default(ESPECES)
+  datePaiement DateTime     @default(now())
+  reference    String       @unique
+  note         String?
+  creeLe       DateTime     @default(now())
+
+  @@index([locataireId, datePaiement])
+  @@index([loyerId])
+  @@map("paiements")
+}
+
+/// Contrat de location liant un locataire à un appartement
+model Contrat {
+  id                String         @id @default(cuid())
+  numero            String         @unique
+  locataireId       String
+  locataire         Locataire      @relation(fields: [locataireId], references: [id], onDelete: Cascade)
+  appartementId     String?
+  appartement       Appartement?   @relation(fields: [appartementId], references: [id], onDelete: SetNull)
+  dateDebut         DateTime
+  dateFin           DateTime?
+  loyerMensuel      Int
+  caution           Int            @default(0)
+  chargesMensuelles Int            @default(0)
+  statut            StatutContrat  @default(ACTIF)
+  clauses           String?
+  creeLe            DateTime       @default(now())
+  modifieLe         DateTime       @updatedAt
+
+  @@index([locataireId, statut])
+  @@map("contrats")
 }

@@ -2,6 +2,7 @@ import type {
   CategorieCharge,
   ModePaiement,
   StatutAppartement,
+  StatutContrat,
   StatutLoyer,
   TypeNotification,
 } from '../types';
@@ -53,4 +54,16 @@ export const LIBELLES_TYPE_NOTIFICATION: Record<TypeNotification, string> = {
   PAIEMENT: 'Paiement',
   MESSAGE: 'Message',
   SYSTEME: 'Système',
+};
+
+export const LIBELLES_STATUT_CONTRAT: Record<StatutContrat, string> = {
+  ACTIF: 'Actif',
+  TERMINE: 'Terminé',
+  RESILIE: 'Résilié',
+};
+
+export const CLASSES_STATUT_CONTRAT: Record<StatutContrat, string> = {
+  ACTIF: 'badge-success',
+  TERMINE: 'badge-ghost',
+  RESILIE: 'badge-error',
 };

@@ -1,8 +1,10 @@
 import type { LucideIcon } from 'lucide-react';
 import {
+  Banknote,
   BarChart3,
   Bell,
   Building2,
+  FileText,
   LayoutDashboard,
   LogOut,
   MessageSquare,
@@ -40,7 +42,9 @@ const GROUPES: GroupeNavigation[] = [
     elements: [
       { chemin: '/Apparts', libelle: 'Appartements', icone: Building2 },
       { chemin: '/Locataires', libelle: 'Locataires', icone: Users },
+      { chemin: '/Contrats', libelle: 'Contrats', icone: FileText },
       { chemin: '/Loyers', libelle: 'Loyers', icone: Wallet },
+      { chemin: '/Paiements', libelle: 'Paiements', icone: Banknote },
       { chemin: '/Charges', libelle: 'Charges', icone: ReceiptText },
     ],
   },

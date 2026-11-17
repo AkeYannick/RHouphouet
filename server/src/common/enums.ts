@@ -22,3 +22,6 @@ export type DestinataireNotification = (typeof DESTINATAIRES_NOTIFICATION)[numbe
 
 export const EXPEDITEURS_MESSAGE = ['ADMIN', 'LOCATAIRE'] as const;
 export type ExpediteurMessage = (typeof EXPEDITEURS_MESSAGE)[number];
+
+export const STATUTS_CONTRAT = ['ACTIF', 'TERMINE', 'RESILIE'] as const;
+export type StatutContrat = (typeof STATUTS_CONTRAT)[number];

@@ -1,21 +1,26 @@
 import type {
   Appartement,
   Charge,
+  Contrat,
   Conversation,
   DetailConversation,
   DonneesAppartement,
   DonneesCharge,
   DonneesConnexion,
+  DonneesContrat,
   DonneesLocataire,
   DonneesLoyer,
   DonneesMessage,
   DonneesPaiement,
+  DonneesPaiementLocataire,
   Locataire,
   Loyer,
   Message,
   Notification,
+  Paiement,
   ReponseConnexion,
   ResultatGenerationLoyers,
+  StatutContrat,
   StatutLoyer,
   TableauDeBord,
 } from '../types';
@@ -222,6 +227,35 @@ export const api = {
       }),
     supprimer: (id: string) =>
       requete<{ message: string }>(`/charges/${id}`, { method: 'DELETE' }),
+  },
+
+  paiements: {
+    lister: (filtres: { locataireId?: string; mois?: string } = {}) =>
+      requete<Paiement[]>(construireAdresse('/paiements', filtres)),
+    creer: (donnees: DonneesPaiementLocataire) =>
+      requete<Loyer>('/paiements', {
+        method: 'POST',
+        body: JSON.stringify(donnees),
+      }),
+    supprimer: (id: string) =>
+      requete<{ message: string }>(`/paiements/${id}`, { method: 'DELETE' }),
+  },
+
+  contrats: {
+    lister: (filtres: { statut?: StatutContrat; locataireId?: string } = {}) =>
+      requete<Contrat[]>(construireAdresse('/contrats', filtres)),
+    creer: (donnees: DonneesContrat) =>
+      requete<Contrat>('/contrats', {
+        method: 'POST',
+        body: JSON.stringify(donnees),
+      }),
+    modifier: (id: string, donnees: Partial<DonneesContrat>) =>
+      requete<Contrat>(`/contrats/${id}`, {
+        method: 'PATCH',
+        body: JSON.stringify(donnees),
+      }),
+    supprimer: (id: string) =>
+      requete<{ message: string }>(`/contrats/${id}`, { method: 'DELETE' }),
   },
 
   notifications: {

@@ -103,7 +103,7 @@ async function principal() {
     const moisPrecedent = obtenirMois(-1);
     const moisCourant = obtenirMois(0);
 
-    await prisma.loyer.upsert({
+    const loyerPrecedent = await prisma.loyer.upsert({
       where: { locataireId_mois: { locataireId: enregistre.id, mois: moisPrecedent } },
       update: {},
       create: {
@@ -115,9 +115,27 @@ async function principal() {
         datePaiement: dateDuMois(moisPrecedent, 4),
         modePaiement: 'MOBILE_MONEY',
         statut: 'PAYE',
-        reference: `LOY-${moisPrecedent.replace('-', '')}-${enregistre.id.slice(0, 4).toUpperCase()}`,
+        reference: `LOY-${moisPrecedent.replace('-', '')}-${enregistre.id.slice(-4).toUpperCase()}`,
       },
     });
+
+    const paiementExistant = await prisma.paiement.findFirst({
+      where: { loyerId: loyerPrecedent.id },
+    });
+
+    if (!paiementExistant && loyerPrecedent.montantRecu > 0) {
+      await prisma.paiement.create({
+        data: {
+          locataireId: enregistre.id,
+          loyerId: loyerPrecedent.id,
+          montant: loyerPrecedent.montantRecu,
+          modePaiement: 'MOBILE_MONEY',
+          datePaiement: loyerPrecedent.datePaiement ?? new Date(),
+          reference: `PAY-${moisPrecedent.replace('-', '')}-${enregistre.id.slice(-4).toUpperCase()}`,
+          note: 'Versement de démonstration',
+        },
+      });
+    }
 
     await prisma.loyer.upsert({
       where: { locataireId_mois: { locataireId: enregistre.id, mois: moisCourant } },
@@ -129,9 +147,32 @@ async function principal() {
         mois: moisCourant,
         dateEcheance: dateDuMois(moisCourant, 5),
         statut: 'EN_ATTENTE',
-        reference: `LOY-${moisCourant.replace('-', '')}-${enregistre.id.slice(0, 4).toUpperCase()}`,
+        reference: `LOY-${moisCourant.replace('-', '')}-${enregistre.id.slice(-4).toUpperCase()}`,
       },
     });
+
+    const contratExistant = await prisma.contrat.findFirst({
+      where: { locataireId: enregistre.id },
+    });
+
+    if (!contratExistant) {
+      await prisma.contrat.create({
+        data: {
+          numero: `CT-${new Date().getFullYear()}-${enregistre.id.slice(-4).toUpperCase()}`,
+          locataireId: enregistre.id,
+          appartementId: locataire.appartementId,
+          dateDebut: locataire.dateEntree,
+          loyerMensuel: locataire.loyerMensuel,
+          caution: locataire.caution,
+          chargesMensuelles: 0,
+          statut: 'ACTIF',
+          clauses:
+            "Le locataire s'engage à régler le loyer au plus tard le 5 de chaque mois. " +
+            "Le logement est destiné à l'habitation principale. " +
+            'Toute dégradation constatée reste à la charge du locataire.',
+        },
+      });
+    }
 
     const nombreMessages = await prisma.message.count({ where: { locataireId: enregistre.id } });
     if (nombreMessages === 0) {

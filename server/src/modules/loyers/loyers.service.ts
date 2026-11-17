@@ -13,6 +13,7 @@ import {
 } from '../../common/statuts';
 import { dateEcheanceDuMois, estMoisValide, libelleMois } from '../../common/dates';
 import { PrismaService } from '../../prisma/prisma.service';
+import { PaiementsService } from '../paiements/paiements.service';
 import { CreerLoyerDto, GenererLoyersDto, PayerLoyerDto } from './dto/loyer.dto';
 
 function formaterMontant(montant: number): string {
@@ -21,7 +22,10 @@ function formaterMontant(montant: number): string {
 
 @Injectable()
 export class LoyersService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly paiements: PaiementsService,
+  ) {}
 
   async lister(filtres: { statut?: string; mois?: string; locataireId?: string }) {
     // Les loyers impayés dont l'échéance est passée passent automatiquement en retard
@@ -141,58 +145,10 @@ export class LoyersService {
 
   /** Enregistre un encaissement supplémentaire sur un loyer existant */
   async payer(id: string, donnees: PayerLoyerDto) {
-    const loyer = await this.trouver(id);
-
-    if (loyer.statut === 'PAYE') {
-      throw new BadRequestException('Ce loyer est déjà entièrement payé');
-    }
-
-    const montantRecu = loyer.montantRecu + donnees.montantRecu;
-    const statut = calculerStatutLoyer(loyer.montantDu, montantRecu, loyer.dateEcheance);
-    const datePaiement = donnees.datePaiement ? new Date(donnees.datePaiement) : new Date();
-    const montantVerse = donnees.montantRecu;
-
-    return this.prisma.$transaction(async (transaction) => {
-      const loyerMisAJour = await transaction.loyer.update({
-        where: { id },
-        data: {
-          montantRecu,
-          statut,
-          datePaiement,
-          modePaiement: donnees.modePaiement ?? loyer.modePaiement,
-        },
-        include: { locataire: { include: { appartement: true } } },
-      });
-
-      await transaction.notification.create({
-        data: {
-          titre: 'Paiement reçu',
-          contenu: `${loyer.locataire.nom} a versé ${formaterMontant(montantVerse)} pour ${libelleMois(
-            loyer.mois,
-          )}.`,
-          type: 'PAIEMENT',
-          destinataire: 'ADMIN',
-          locataireId: loyer.locataireId,
-          lien: '/Loyers',
-        },
-      });
-
-      await transaction.notification.create({
-        data: {
-          titre: 'Paiement enregistré',
-          contenu: `Votre versement de ${formaterMontant(
-            montantVerse,
-          )} a bien été enregistré. Reste à payer : ${formaterMontant(
-            Math.max(loyerMisAJour.montantDu - loyerMisAJour.montantRecu, 0),
-          )}.`,
-          type: 'PAIEMENT',
-          destinataire: 'LOCATAIRE',
-          locataireId: loyer.locataireId,
-          lien: '/Loyers',
-        },
-      });
-
-      return loyerMisAJour;
+    return this.paiements.encaisserLoyer(id, {
+      montantRecu: donnees.montantRecu,
+      modePaiement: donnees.modePaiement,
+      datePaiement: donnees.datePaiement,
     });
   }
 

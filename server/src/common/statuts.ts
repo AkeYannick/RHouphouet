@@ -28,3 +28,9 @@ export function genererReference(mois: string): string {
   const identifiant = Math.random().toString(36).slice(2, 8).toUpperCase();
   return `LOY-${mois.replace('-', '')}-${identifiant}`;
 }
+
+/** Génère une référence unique et lisible pour un versement */
+export function genererReferencePaiement(mois: string): string {
+  const identifiant = Math.random().toString(36).slice(2, 8).toUpperCase();
+  return `PAY-${mois.replace('-', '')}-${identifiant}`;
+}
