@@ -72,7 +72,7 @@ class AuthViewModel extends ChangeNotifier {
       return false;
     } catch (_) {
       _errorMessage =
-          "Ce numéro n'est associé à aucun logement. Contactez votre bailleur.";
+          "Impossible de joindre le service. Vérifiez l'adresse du serveur et votre connexion.";
       return false;
     } finally {
       _isLoading = false;

@@ -1,4 +1,5 @@
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 import 'package:rmobile/core/config/app_config.dart';
 import 'package:rmobile/core/session/session_store.dart';
 
@@ -28,6 +29,9 @@ class ApiClient {
               headers: const {'Content-Type': 'application/json'},
             ),
           ) {
+    if (kDebugMode) {
+      debugPrint('[API] URL de base : ${AppConfig.urlApi}');
+    }
     _dio.interceptors.add(
       InterceptorsWrapper(
         onRequest: (options, handler) async {
