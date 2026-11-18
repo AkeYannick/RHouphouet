@@ -1,12 +1,14 @@
 import { ValidationPipe } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { NestFactory } from '@nestjs/core';
 import type { NextFunction, Request, Response } from 'express';
 import helmet from 'helmet';
 import { AppModule } from './app.module';
-import { FiltreExceptions } from './common/filtre-exceptions';
+import { FiltreExceptions } from './common/filters/filtre-exceptions';
 
 async function demarrer() {
   const application = await NestFactory.create(AppModule);
+  const configuration = application.get(ConfigService);
 
   application.use(helmet());
   application.use((_demande: Request, reponse: Response, suivante: NextFunction) => {
@@ -17,7 +19,7 @@ async function demarrer() {
   // Toutes les routes de l'API sont préfixées par /api
   application.setGlobalPrefix('api');
 
-  const origines = (process.env.CLIENT_URL ?? 'http://localhost:5173')
+  const origines = (configuration.get<string>('clientUrl') ?? 'http://localhost:5173')
     .split(',')
     .map((origine) => origine.trim())
     .filter(Boolean);
@@ -49,7 +51,7 @@ async function demarrer() {
   application.useGlobalFilters(new FiltreExceptions());
   application.enableShutdownHooks();
 
-  const port = Number(process.env.PORT ?? 5000);
+  const port = configuration.get<number>('port') ?? 5000;
   await application.listen(port);
 
   console.log(`Service disponible sur http://localhost:${port}/api`);

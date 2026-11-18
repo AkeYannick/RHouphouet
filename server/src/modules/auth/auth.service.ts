@@ -16,23 +16,11 @@ export class AuthService {
   private readonly motDePasseAdmin: string;
 
   constructor(configuration: ConfigService) {
-    const email = configuration.get<string>('ADMIN_EMAIL')?.trim().toLowerCase();
-    const motDePasse = configuration.get<string>('ADMIN_MOT_DE_PASSE');
-
-    if (!email || !motDePasse) {
-      throw new Error(
-        'ADMIN_EMAIL et ADMIN_MOT_DE_PASSE sont requis. Renseignez-les dans server/.env.',
-      );
-    }
-
-    if (motDePasse.length < 12) {
-      throw new Error(
-        'ADMIN_MOT_DE_PASSE doit contenir au moins 12 caractères pour résister aux attaques par force brute.',
-      );
-    }
-
-    this.emailAdmin = email;
-    this.motDePasseAdmin = motDePasse;
+    this.emailAdmin = configuration
+      .getOrThrow<string>('admin.email')
+      .trim()
+      .toLowerCase();
+    this.motDePasseAdmin = configuration.getOrThrow<string>('admin.motDePasse');
   }
 
   private empreinte(valeur: string) {

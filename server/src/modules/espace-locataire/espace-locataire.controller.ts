@@ -9,7 +9,7 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
-import { Public } from '../auth/public.decorator';
+import { Public } from '../../common/decorators/public.decorator';
 import {
   ConnexionLocataireDto,
   MessageLocataireDto,

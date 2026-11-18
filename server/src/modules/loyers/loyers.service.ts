@@ -10,8 +10,8 @@ import {
   calculerStatutLoyer,
   genererReference,
   type StatutLoyer,
-} from '../../common/statuts';
-import { dateEcheanceDuMois, estMoisValide, libelleMois } from '../../common/dates';
+} from '../../common/utils/statuts-loyer';
+import { dateEcheanceDuMois, estMoisValide, libelleMois } from '../../common/utils/dates';
 import { PrismaService } from '../../prisma/prisma.service';
 import { PaiementsService } from '../paiements/paiements.service';
 import { CreerLoyerDto, GenererLoyersDto, PayerLoyerDto } from './dto/loyer.dto';

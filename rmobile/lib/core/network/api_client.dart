@@ -68,10 +68,13 @@ class ApiClient {
       final reponse = await action();
       return reponse.data;
     } on DioException catch (erreur) {
-      throw ApiException(
-        _messageErreur(erreur),
-        statut: erreur.response?.statusCode ?? 0,
-      );
+      final message = _messageErreur(erreur);
+      final statut = erreur.response?.statusCode;
+      final details = kDebugMode
+          ? '\n[API : ${AppConfig.urlApi} · ${erreur.type.name}'
+                '${statut != null ? ' · HTTP $statut' : ''}]'
+          : '';
+      throw ApiException('$message$details', statut: statut ?? 0);
     }
   }
 

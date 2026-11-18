@@ -10,7 +10,7 @@ import {
 import { Throttle } from '@nestjs/throttler';
 import { AuthService } from './auth.service';
 import { ConnexionDto } from './dto/connexion.dto';
-import { Public } from './public.decorator';
+import { Public } from '../../common/decorators/public.decorator';
 
 interface RequeteAdministrateur {
   administrateur?: { email: string; expireLe: number };

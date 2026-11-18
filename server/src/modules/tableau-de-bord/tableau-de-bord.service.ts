@@ -4,7 +4,7 @@ import {
   debutMoisSuivant,
   derniersMois,
   moisCourant,
-} from '../../common/dates';
+} from '../../common/utils/dates';
 import { PrismaService } from '../../prisma/prisma.service';
 
 @Injectable()

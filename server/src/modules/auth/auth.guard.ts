@@ -6,7 +6,7 @@ import {
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { AuthService } from './auth.service';
-import { CLE_ROUTE_PUBLIQUE } from './public.decorator';
+import { CLE_ROUTE_PUBLIQUE } from '../../common/decorators/public.decorator';
 
 interface RequeteAuthentifiee {
   headers: Record<string, string | undefined>;

@@ -8,8 +8,8 @@ import {
   calculerStatutLoyer,
   genererReference,
   genererReferencePaiement,
-} from '../../common/statuts';
-import { dateEcheanceDuMois, estMoisValide, libelleMois } from '../../common/dates';
+} from '../../common/utils/statuts-loyer';
+import { dateEcheanceDuMois, estMoisValide, libelleMois } from '../../common/utils/dates';
 import { PrismaService } from '../../prisma/prisma.service';
 import {
   CreerPaiementDto,
