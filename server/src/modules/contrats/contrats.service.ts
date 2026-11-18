@@ -8,6 +8,10 @@ import { randomBytes } from 'node:crypto';
 import type { Prisma } from '../../generated/prisma/client';
 import { STATUTS_CONTRAT, type StatutContrat } from '../../common/enums';
 import { PrismaService } from '../../prisma/prisma.service';
+import {
+  ContratPdfService,
+  type PdfContrat,
+} from './contrat-pdf.service';
 import { CreerContratDto, ModifierContratDto } from './dto/contrat.dto';
 
 function formaterMontant(montant: number): string {
@@ -21,7 +25,10 @@ function genererNumeroContrat(dateDebut: Date): string {
 
 @Injectable()
 export class ContratsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly pdfService: ContratPdfService,
+  ) {}
 
   async lister(filtres: { statut?: string; locataireId?: string } = {}) {
     const where: Prisma.ContratWhereInput = {};
@@ -64,6 +71,25 @@ export class ContratsService {
       include: { locataire: true, appartement: true },
       orderBy: { dateDebut: 'desc' },
     });
+  }
+
+  /** PDF du contrat pour l'administration */
+  async pdf(id: string): Promise<PdfContrat> {
+    const contrat = await this.trouver(id);
+    return this.pdfService.generer(contrat);
+  }
+
+  /** PDF du contrat actif pour l'espace locataire */
+  async pdfActif(locataireId: string): Promise<PdfContrat> {
+    const contrat = await this.trouverActif(locataireId);
+
+    if (!contrat) {
+      throw new NotFoundException(
+        "Aucun contrat actif n'est disponible pour votre logement.",
+      );
+    }
+
+    return this.pdfService.generer(contrat);
   }
 
   async creer(donnees: CreerContratDto) {

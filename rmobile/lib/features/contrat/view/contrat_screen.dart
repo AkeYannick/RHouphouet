@@ -1,4 +1,9 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
+import 'package:open_filex/open_filex.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:rmobile/core/network/api_client.dart';
 import 'package:rmobile/core/themes/app_colors.dart';
 import 'package:rmobile/core/themes/statut_couleurs.dart';
 import 'package:rmobile/core/utils/format.dart';
@@ -19,10 +24,55 @@ class ContratScreen extends StatefulWidget {
 class _ContratScreenState extends State<ContratScreen> {
   final ContratViewModel _viewModel = ContratViewModel();
 
+  bool _telechargement = false;
+
   @override
   void dispose() {
     _viewModel.dispose();
     super.dispose();
+  }
+
+  Future<void> _telechargerContrat() async {
+    final contrat = _viewModel.contrat;
+
+    if (contrat == null || _telechargement) {
+      return;
+    }
+
+    setState(() => _telechargement = true);
+
+    try {
+      final octets = await _viewModel.telechargerPdf();
+      final dossier = await getTemporaryDirectory();
+      final fichier = File('${dossier.path}/contrat-${contrat.numero}.pdf');
+      await fichier.writeAsBytes(octets, flush: true);
+
+      final resultat = await OpenFilex.open(fichier.path);
+
+      if (resultat.type != ResultType.done && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Contrat enregistré : ${fichier.path}', maxLines: 3),
+          ),
+        );
+      }
+    } on ApiException catch (erreur) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(erreur.message)),
+      );
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Impossible de télécharger le contrat. Réessayez.'),
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _telechargement = false);
+      }
+    }
   }
 
   void _seReconnecter() {
@@ -129,6 +179,8 @@ class _ContratScreenState extends State<ContratScreen> {
         padding: const EdgeInsets.fromLTRB(20, 16, 20, 28),
         children: [
           _enteteContrat(contrat),
+          const SizedBox(height: 16),
+          _carteDocument(contrat),
           const SizedBox(height: 16),
           _carteConditions(contrat),
           const SizedBox(height: 16),
@@ -257,9 +309,84 @@ class _ContratScreenState extends State<ContratScreen> {
     );
   }
 
+  Widget _carteDocument(ContratModel contrat) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.blanc,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: Colors.grey.shade200),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 48,
+            height: 48,
+            decoration: BoxDecoration(
+              color: const Color(0xFFEDF1FC),
+              borderRadius: BorderRadius.circular(14),
+            ),
+            child: const Icon(
+              Icons.picture_as_pdf_outlined,
+              color: AppColors.bleuBouton,
+              size: 24,
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Contrat de location',
+                  style: TextStyle(
+                    color: AppColors.bleuprofond,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  'PDF · ${contrat.numero} · ${libelleStatutContrat(contrat.statut)}',
+                  style: TextStyle(color: Colors.grey.shade600, fontSize: 12),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+          Material(
+            color: AppColors.bleuBouton,
+            borderRadius: BorderRadius.circular(12),
+            child: InkWell(
+              borderRadius: BorderRadius.circular(12),
+              onTap: _telechargement ? null : _telechargerContrat,
+              child: SizedBox(
+                width: 44,
+                height: 44,
+                child: _telechargement
+                    ? const Padding(
+                        padding: EdgeInsets.all(12),
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2.2,
+                          color: AppColors.blanc,
+                        ),
+                      )
+                    : const Icon(
+                        Icons.download_rounded,
+                        color: AppColors.blanc,
+                        size: 22,
+                      ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _carteConditions(ContratModel contrat) {
     return _carte(
-      titre: 'Éléments du bail',
+      titre: 'Détails du bail',
       children: [
         _ligne('Locataire', contrat.nomLocataire ?? '—'),
         _ligne('Appartement', contrat.appartement?.numero ?? '—'),

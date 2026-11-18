@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:rmobile/core/config/app_config.dart';
@@ -63,23 +65,48 @@ class ApiClient {
     return _executer(() => _dio.delete(chemin));
   }
 
+  /// Télécharge un contenu binaire (PDF, image…).
+  Future<List<int>> getOctets(String chemin) async {
+    try {
+      final reponse = await _dio.get<List<int>>(
+        chemin,
+        options: Options(responseType: ResponseType.bytes),
+      );
+      return reponse.data ?? const [];
+    } on DioException catch (erreur) {
+      throw _exception(erreur);
+    }
+  }
+
   Future<dynamic> _executer(Future<Response<dynamic>> Function() action) async {
     try {
       final reponse = await action();
       return reponse.data;
     } on DioException catch (erreur) {
-      final message = _messageErreur(erreur);
-      final statut = erreur.response?.statusCode;
-      final details = kDebugMode
-          ? '\n[API : ${AppConfig.urlApi} · ${erreur.type.name}'
-                '${statut != null ? ' · HTTP $statut' : ''}]'
-          : '';
-      throw ApiException('$message$details', statut: statut ?? 0);
+      throw _exception(erreur);
     }
   }
 
+  ApiException _exception(DioException erreur) {
+    final message = _messageErreur(erreur);
+    final statut = erreur.response?.statusCode;
+    final details = kDebugMode
+        ? '\n[API : ${AppConfig.urlApi} · ${erreur.type.name}'
+              '${statut != null ? ' · HTTP $statut' : ''}]'
+        : '';
+    return ApiException('$message$details', statut: statut ?? 0);
+  }
+
   String _messageErreur(DioException erreur) {
-    final donnees = erreur.response?.data;
+    var donnees = erreur.response?.data;
+
+    if (donnees is List<int>) {
+      try {
+        donnees = jsonDecode(utf8.decode(donnees));
+      } catch (_) {
+        donnees = null;
+      }
+    }
 
     if (donnees is Map) {
       final message = donnees['message'];

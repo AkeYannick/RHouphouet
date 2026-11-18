@@ -56,6 +56,10 @@ export class EspaceLocataireService {
     return this.contrats.trouverActif(locataireId);
   }
 
+  contratActifPdf(locataireId: string) {
+    return this.contrats.pdfActif(locataireId);
+  }
+
   enregistrerPaiement(locataireId: string, donnees: PaiementLocataireDto) {
     return this.paiements.enregistrer(
       {

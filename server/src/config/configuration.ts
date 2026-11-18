@@ -11,6 +11,13 @@ export interface ConfigurationApplication {
     email: string | undefined;
     motDePasse: string | undefined;
   };
+  bailleur: {
+    nom: string;
+    adresse: string;
+    telephone: string;
+    email: string;
+  };
+  lieuSignature: string;
 }
 
 export default (): ConfigurationApplication => ({
@@ -22,4 +29,13 @@ export default (): ConfigurationApplication => ({
     email: process.env.ADMIN_EMAIL,
     motDePasse: process.env.ADMIN_MOT_DE_PASSE,
   },
+  bailleur: {
+    nom:
+      process.env.BAILLEUR_NOM ??
+      'Monsieur HOUPHOUET Kouadio Hénoch Tiburce Eric',
+    adresse: process.env.BAILLEUR_ADRESSE ?? 'Abidjan, Côte d’Ivoire',
+    telephone: process.env.BAILLEUR_TELEPHONE ?? '',
+    email: process.env.BAILLEUR_EMAIL ?? '',
+  },
+  lieuSignature: process.env.LIEU_SIGNATURE ?? 'Abidjan',
 });

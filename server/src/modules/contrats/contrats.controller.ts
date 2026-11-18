@@ -7,6 +7,7 @@ import {
   Patch,
   Post,
   Query,
+  StreamableFile,
 } from '@nestjs/common';
 import { ContratsService } from './contrats.service';
 import { CreerContratDto, ModifierContratDto } from './dto/contrat.dto';
@@ -26,6 +27,17 @@ export class ContratsController {
   @Get(':id')
   trouver(@Param('id') id: string) {
     return this.service.trouver(id);
+  }
+
+  @Get(':id/pdf')
+  async pdf(@Param('id') id: string): Promise<StreamableFile> {
+    const { contenu, nomFichier } = await this.service.pdf(id);
+
+    return new StreamableFile(contenu, {
+      type: 'application/pdf',
+      disposition: `attachment; filename="${nomFichier}"`,
+      length: contenu.length,
+    });
   }
 
   @Post()

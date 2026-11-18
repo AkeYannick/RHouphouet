@@ -144,6 +144,54 @@ async function requete<T>(chemin: string, options: RequestInit = {}): Promise<T>
   return donnees as T;
 }
 
+async function requeteBinaire(chemin: string): Promise<Blob> {
+  const entetes = new Headers();
+  const jeton = lireJeton();
+
+  if (jeton) {
+    entetes.set('Authorization', `Bearer ${jeton}`);
+  }
+
+  let reponse: Response;
+
+  try {
+    reponse = await fetch(`${URL_API}${chemin}`, { headers: entetes });
+  } catch {
+    throw new ErreurApi(
+      'Le service est momentanément indisponible. Veuillez réessayer dans un instant.',
+    );
+  }
+
+  if (!reponse.ok) {
+    const texte = await reponse.text();
+    let donnees: unknown = null;
+
+    if (texte) {
+      try {
+        donnees = JSON.parse(texte);
+      } catch {
+        donnees = texte;
+      }
+    }
+
+    if (reponse.status === 401) {
+      effacerSession();
+      window.dispatchEvent(new Event('rhouphouet:session-expiree'));
+      throw new ErreurApi('Votre session a expiré. Veuillez vous reconnecter.', 401);
+    }
+
+    throw new ErreurApi(
+      extraireMessage(donnees) ??
+        (reponse.status >= 500
+          ? 'Le service est momentanément indisponible. Veuillez réessayer dans un instant.'
+          : 'Le document n’a pas pu être généré. Veuillez réessayer.'),
+      reponse.status,
+    );
+  }
+
+  return reponse.blob();
+}
+
 export const api = {
   auth: {
     connexion: (donnees: DonneesConnexion) =>
@@ -256,6 +304,7 @@ export const api = {
       }),
     supprimer: (id: string) =>
       requete<{ message: string }>(`/contrats/${id}`, { method: 'DELETE' }),
+    pdf: (id: string) => requeteBinaire(`/contrats/${id}/pdf`),
   },
 
   notifications: {

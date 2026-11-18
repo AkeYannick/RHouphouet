@@ -8,7 +8,7 @@ interface ProprietesModale {
   onFermer: () => void;
   children: ReactNode;
   pied?: ReactNode;
-  taille?: 'md' | 'lg';
+  taille?: 'md' | 'lg' | 'xl';
 }
 
 export function Modale({
@@ -59,7 +59,11 @@ export function Modale({
     >
       <div
         className={`flex max-h-[92dvh] w-full flex-col overflow-hidden rounded-t-2xl bg-base-100 shadow-2xl sm:rounded-2xl ${
-          taille === 'lg' ? 'sm:max-w-3xl' : 'sm:max-w-xl'
+          taille === 'xl'
+            ? 'sm:max-w-5xl'
+            : taille === 'lg'
+              ? 'sm:max-w-3xl'
+              : 'sm:max-w-xl'
         }`}
       >
         <div className="flex items-start justify-between gap-4 border-b border-base-300/60 px-4 py-4 sm:px-6">

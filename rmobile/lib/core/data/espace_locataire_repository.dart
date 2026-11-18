@@ -127,6 +127,11 @@ class EspaceLocataireRepository {
     return ContratModel.fromJson(Map<String, dynamic>.from(reponse));
   }
 
+  /// PDF du contrat actif, généré par le serveur.
+  Future<List<int>> telechargerContratPdf() {
+    return _authentifie(() => _client.getOctets('$_base/contrat/pdf'));
+  }
+
   Future<List<MessageModel>> messages() async {
     final reponse = await _authentifie(() => _client.get('$_base/messages'));
     final liste = reponse is Map ? reponse['messages'] : reponse;

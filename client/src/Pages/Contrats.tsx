@@ -1,11 +1,16 @@
 import {
   Ban,
   CalendarDays,
+  CalendarClock,
   CheckCircle2,
+  Download,
+  Eye,
   FileText,
+  Home,
   Plus,
   ShieldCheck,
   Trash2,
+  User,
   Wallet,
 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react';
@@ -35,19 +40,42 @@ interface FormulaireContrat {
   appartementId: string;
   dateDebut: string;
   dateFin: string;
+  dureeMois: string;
   loyerMensuel: string;
+  chargesMensuelles: string;
   caution: string;
   statut: StatutContrat;
   clauses: string;
 }
 
+/** Ajoute un nombre de mois à une date au format AAAA-MM-JJ. */
+function ajouterMois(dateIso: string, mois: number): string {
+  const [annee, numeroMois, jour] = dateIso.split('-').map(Number);
+
+  if (!annee || !numeroMois || !jour) {
+    return '';
+  }
+
+  const dernierJour = new Date(annee, numeroMois - 1 + mois + 1, 0).getDate();
+  const date = new Date(annee, numeroMois - 1 + mois, Math.min(jour, dernierJour));
+
+  const moisTexte = String(date.getMonth() + 1).padStart(2, '0');
+  const jourTexte = String(date.getDate()).padStart(2, '0');
+
+  return `${date.getFullYear()}-${moisTexte}-${jourTexte}`;
+}
+
 function formulaireVide(): FormulaireContrat {
+  const dateDebut = dateDuJour();
+
   return {
     locataireId: '',
     appartementId: '',
-    dateDebut: dateDuJour(),
-    dateFin: '',
+    dateDebut,
+    dateFin: ajouterMois(dateDebut, 12),
+    dureeMois: '12',
     loyerMensuel: '',
+    chargesMensuelles: '',
     caution: '',
     statut: 'ACTIF',
     clauses: '',
@@ -82,6 +110,9 @@ const Contrats = () => {
   const [formulaire, setFormulaire] = useState<FormulaireContrat>(formulaireVide);
   const [erreurFormulaire, setErreurFormulaire] = useState<string | null>(null);
   const [enregistrement, setEnregistrement] = useState(false);
+
+  const [apercu, setApercu] = useState<{ url: string; contrat: Contrat } | null>(null);
+  const [telechargementId, setTelechargementId] = useState<string | null>(null);
 
   /**
    * Chargement indépendant des trois listes : si l'une échoue,
@@ -147,6 +178,14 @@ const Contrats = () => {
     void charger();
   }, [charger]);
 
+  useEffect(() => {
+    if (!apercu) {
+      return;
+    }
+
+    return () => URL.revokeObjectURL(apercu.url);
+  }, [apercu]);
+
   const contratsFiltres = useMemo(
     () =>
       filtreStatut === 'TOUS'
@@ -167,6 +206,17 @@ const Contrats = () => {
   const cautionsActives = contratsActifs.reduce(
     (total, contrat) => total + (contrat.caution ?? 0),
     0,
+  );
+
+  const appartementChoisi =
+    appartements.find((appartement) => appartement.id === formulaire.appartementId) ?? null;
+
+  const totalMensuelApercu =
+    (Number(formulaire.loyerMensuel) || 0) +
+    (Number(formulaire.chargesMensuelles) || 0);
+
+  const apercuEnTelechargement = Boolean(
+    apercu && telechargementId === apercu.contrat.id,
   );
 
   /** Locataires qui ont déjà un contrat actif (pour éviter les doublons) */
@@ -203,6 +253,60 @@ const Contrats = () => {
     }));
   };
 
+  const changerDateDebut = (valeur: string) => {
+    setFormulaire((precedent) => ({
+      ...precedent,
+      dateDebut: valeur,
+      dateFin:
+        precedent.dureeMois && precedent.dureeMois !== 'personnalisee' && valeur
+          ? ajouterMois(valeur, Number(precedent.dureeMois))
+          : precedent.dateFin,
+    }));
+  };
+
+  const changerDuree = (valeur: string) => {
+    setFormulaire((precedent) => ({
+      ...precedent,
+      dureeMois: valeur,
+      dateFin:
+        valeur === 'personnalisee'
+          ? precedent.dateFin
+          : valeur && precedent.dateDebut
+            ? ajouterMois(precedent.dateDebut, Number(valeur))
+            : '',
+    }));
+  };
+
+  const ouvrirApercu = async (contrat: Contrat) => {
+    try {
+      const document = await api.contrats.pdf(contrat.id);
+      setApercu({ url: URL.createObjectURL(document), contrat });
+    } catch (probleme) {
+      setErreur(messageErreur(probleme));
+    }
+  };
+
+  const telechargerPdf = async (contrat: Contrat) => {
+    setTelechargementId(contrat.id);
+
+    try {
+      const document = await api.contrats.pdf(contrat.id);
+      const url = URL.createObjectURL(document);
+      const lien = window.document.createElement('a');
+
+      lien.href = url;
+      lien.download = `contrat-${contrat.numero}.pdf`;
+      window.document.body.appendChild(lien);
+      lien.click();
+      lien.remove();
+      URL.revokeObjectURL(url);
+    } catch (probleme) {
+      setErreur(messageErreur(probleme));
+    } finally {
+      setTelechargementId(null);
+    }
+  };
+
   const creer = async (evenement: FormEvent) => {
     evenement.preventDefault();
 
@@ -229,6 +333,15 @@ const Contrats = () => {
       return;
     }
 
+    const charges = formulaire.chargesMensuelles
+      ? Number(formulaire.chargesMensuelles)
+      : 0;
+
+    if (!Number.isFinite(charges) || charges < 0) {
+      setErreurFormulaire('Les charges mensuelles doivent être un montant positif');
+      return;
+    }
+
     const caution = formulaire.caution ? Number(formulaire.caution) : undefined;
 
     if (caution !== undefined && (!Number.isFinite(caution) || caution < 0)) {
@@ -252,6 +365,7 @@ const Contrats = () => {
       dateDebut: formulaire.dateDebut,
       dateFin: formulaire.dateFin || undefined,
       loyerMensuel: loyer,
+      chargesMensuelles: charges,
       caution,
       statut: formulaire.statut,
       clauses: formulaire.clauses.trim() || undefined,
@@ -261,9 +375,10 @@ const Contrats = () => {
     setErreurFormulaire(null);
 
     try {
-      await api.contrats.creer(donnees);
-      afficherMessage('Contrat créé avec succès');
+      const contrat = await api.contrats.creer(donnees);
+      afficherMessage(`Contrat ${contrat.numero} créé avec succès`);
       setModaleOuverte(false);
+      void ouvrirApercu(contrat);
       await charger(true);
     } catch (probleme) {
       setErreurFormulaire(messageErreur(probleme));
@@ -489,14 +604,33 @@ const Contrats = () => {
                     )}
                   </div>
 
-                  <button
-                    type="button"
-                    onClick={() => void supprimer(contrat)}
-                    className="btn btn-ghost btn-xs btn-square text-error"
-                    aria-label="Supprimer le contrat"
-                  >
-                    <Trash2 size={14} />
-                  </button>
+                  <div className="flex items-center gap-1">
+                    <button
+                      type="button"
+                      onClick={() => void ouvrirApercu(contrat)}
+                      className="btn btn-ghost btn-xs gap-1"
+                    >
+                      <Eye size={13} />
+                      Aperçu
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => void telechargerPdf(contrat)}
+                      disabled={telechargementId === contrat.id}
+                      className="btn btn-ghost btn-xs gap-1 text-primary"
+                    >
+                      <Download size={13} />
+                      {telechargementId === contrat.id ? 'PDF…' : 'PDF'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => void supprimer(contrat)}
+                      className="btn btn-ghost btn-xs btn-square text-error"
+                      aria-label="Supprimer le contrat"
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  </div>
                 </div>
               </div>
             </article>
@@ -507,7 +641,7 @@ const Contrats = () => {
       <Modale
         ouvert={modaleOuverte}
         titre="Créer un contrat de location"
-        description="Les montants sont préremplis à partir de la fiche du locataire."
+        description="Renseignez les éléments du bail : le PDF est généré automatiquement selon le modèle de bail d'habitation."
         onFermer={fermerModale}
         taille="lg"
         pied={
@@ -536,8 +670,13 @@ const Contrats = () => {
           onSubmit={(evenement) => void creer(evenement)}
           className="grid gap-4 sm:grid-cols-2"
         >
+          <div className="flex items-center gap-2 border-b border-base-300/60 pb-1.5 sm:col-span-2">
+            <User size={15} className="text-primary" />
+            <h3 className="text-sm font-semibold">1. Les parties</h3>
+          </div>
+
           <div className="sm:col-span-2">
-            <Champ libelle="Locataire">
+            <Champ libelle="Locataire (le preneur)">
               <select
                 className="select select-bordered w-full"
                 value={formulaire.locataireId}
@@ -554,7 +693,8 @@ const Contrats = () => {
                 </option>
                 {locataires.map((locataire) => (
                   <option key={locataire.id} value={locataire.id}>
-                    {locataire.appartement?.numero ?? 'Sans appartement'} — {locataire.nom}
+                    {locataire.appartement?.numero ?? 'Sans appartement'} — {locataire.nom} ·{' '}
+                    {locataire.telephone}
                     {idsAvecContratActif.has(locataire.id) ? ' (contrat actif)' : ''}
                   </option>
                 ))}
@@ -575,21 +715,10 @@ const Contrats = () => {
             )}
           </div>
 
-          <Champ libelle="Appartement concerné">
-            <select
-              className="select select-bordered w-full"
-              value={formulaire.appartementId}
-              onChange={(evenement) =>
-                setFormulaire({ ...formulaire, appartementId: evenement.target.value })
-              }
-            >
-              <option value="">— Aucun appartement —</option>
-              {appartements.map((appartement) => (
-                <option key={appartement.id} value={appartement.id}>
-                  {appartement.numero} — {formaterMontant(appartement.loyerMensuel)}
-                </option>
-              ))}
-            </select>
+          <Champ libelle="Bailleur (prérempli sur le contrat)">
+            <div className="flex min-h-12 items-center rounded-box border border-base-300 bg-base-200/60 px-4 text-sm">
+              Résidence Houphouët · Abidjan
+            </div>
           </Champ>
 
           <Champ libelle="Statut initial">
@@ -609,29 +738,99 @@ const Contrats = () => {
             </select>
           </Champ>
 
+          <div className="flex items-center gap-2 border-b border-base-300/60 pb-1.5 sm:col-span-2">
+            <Home size={15} className="text-primary" />
+            <h3 className="text-sm font-semibold">2. Le logement</h3>
+          </div>
+
+          <div className="sm:col-span-2">
+            <Champ
+              libelle="Appartement concerné"
+              aide="La désignation de l'appartement est reprise dans le contrat."
+            >
+              <select
+                className="select select-bordered w-full"
+                value={formulaire.appartementId}
+                onChange={(evenement) =>
+                  setFormulaire({ ...formulaire, appartementId: evenement.target.value })
+                }
+              >
+                <option value="">— Aucun appartement —</option>
+                {appartements.map((appartement) => (
+                  <option key={appartement.id} value={appartement.id}>
+                    {appartement.numero} — {appartement.designation ?? 'Sans désignation'} ·{' '}
+                    {appartement.nombrePieces} pièce(s) ·{' '}
+                    {formaterMontant(appartement.loyerMensuel)}
+                  </option>
+                ))}
+              </select>
+            </Champ>
+
+            {appartementChoisi && (
+              <div className="mt-2 rounded-xl bg-base-200/60 px-4 py-3 text-sm">
+                <p className="font-medium">
+                  Appartement {appartementChoisi.numero}
+                  {appartementChoisi.designation
+                    ? ` · ${appartementChoisi.designation}`
+                    : ''}
+                </p>
+                <p className="text-xs text-base-content/60">
+                  {appartementChoisi.nombrePieces} pièce(s) principale(s) — loyer de
+                  référence {formaterMontant(appartementChoisi.loyerMensuel)}
+                </p>
+              </div>
+            )}
+          </div>
+
+          <div className="flex items-center gap-2 border-b border-base-300/60 pb-1.5 sm:col-span-2">
+            <CalendarClock size={15} className="text-primary" />
+            <h3 className="text-sm font-semibold">3. Durée du bail</h3>
+          </div>
+
           <Champ libelle="Date de début">
             <input
               type="date"
               className="input input-bordered w-full"
               value={formulaire.dateDebut}
-              onChange={(evenement) =>
-                setFormulaire({ ...formulaire, dateDebut: evenement.target.value })
-              }
+              onChange={(evenement) => changerDateDebut(evenement.target.value)}
               required
             />
           </Champ>
 
-          <Champ libelle="Date de fin (optionnelle)">
+          <Champ libelle="Durée" aide="La date de fin est calculée automatiquement.">
+            <select
+              className="select select-bordered w-full"
+              value={formulaire.dureeMois}
+              onChange={(evenement) => changerDuree(evenement.target.value)}
+            >
+              <option value="12">12 mois (1 an)</option>
+              <option value="24">24 mois (2 ans)</option>
+              <option value="36">36 mois (3 ans)</option>
+              <option value="">Durée indéterminée</option>
+              <option value="personnalisee">Personnalisée</option>
+            </select>
+          </Champ>
+
+          <Champ libelle="Date de fin">
             <input
               type="date"
               className="input input-bordered w-full"
               value={formulaire.dateFin}
               min={formulaire.dateDebut || undefined}
               onChange={(evenement) =>
-                setFormulaire({ ...formulaire, dateFin: evenement.target.value })
+                setFormulaire({
+                  ...formulaire,
+                  dateFin: evenement.target.value,
+                  dureeMois: 'personnalisee',
+                })
               }
             />
           </Champ>
+
+          <div className="flex items-center gap-2 border-b border-base-300/60 pb-1.5 sm:col-span-2">
+            <Wallet size={15} className="text-primary" />
+            <h3 className="text-sm font-semibold">4. Loyers et garantie</h3>
+          </div>
 
           <Champ libelle="Loyer mensuel (FCFA)">
             <input
@@ -646,7 +845,23 @@ const Contrats = () => {
             />
           </Champ>
 
-          <Champ libelle="Caution (FCFA)">
+          <Champ libelle="Charges mensuelles (FCFA)">
+            <input
+              type="number"
+              min={0}
+              className="input input-bordered w-full"
+              value={formulaire.chargesMensuelles}
+              onChange={(evenement) =>
+                setFormulaire({
+                  ...formulaire,
+                  chargesMensuelles: evenement.target.value,
+                })
+              }
+              placeholder="0"
+            />
+          </Champ>
+
+          <Champ libelle="Caution / dépôt de garantie (FCFA)">
             <input
               type="number"
               min={0}
@@ -658,15 +873,30 @@ const Contrats = () => {
             />
           </Champ>
 
+          <div className="flex flex-col justify-center rounded-xl bg-primary/5 px-4 py-3">
+            <span className="text-xs text-base-content/60">Total mensuel</span>
+            <span className="text-lg font-semibold text-primary">
+              {formaterMontant(totalMensuelApercu)}
+            </span>
+          </div>
+
+          <div className="flex items-center gap-2 border-b border-base-300/60 pb-1.5 sm:col-span-2">
+            <FileText size={15} className="text-primary" />
+            <h3 className="text-sm font-semibold">5. Clauses particulières</h3>
+          </div>
+
           <div className="sm:col-span-2">
-            <Champ libelle="Clauses particulières (optionnel)">
+            <Champ
+              libelle="Clauses complémentaires (optionnel)"
+              aide="Les 17 clauses du bail d'habitation (usage, entretien, garantie, résiliation…) sont incluses automatiquement dans le PDF."
+            >
               <textarea
                 className="textarea textarea-bordered min-h-24 w-full"
                 value={formulaire.clauses}
                 onChange={(evenement) =>
                   setFormulaire({ ...formulaire, clauses: evenement.target.value })
                 }
-                placeholder="Ex. loyer payable le 5 de chaque mois, charges locatives incluses…"
+                placeholder="Ex. le locataire autorise les visites avec un préavis de 48 heures…"
               />
             </Champ>
           </div>
@@ -677,6 +907,63 @@ const Contrats = () => {
             </p>
           )}
         </form>
+      </Modale>
+
+      <Modale
+        ouvert={apercu !== null}
+        titre={apercu ? `Contrat ${apercu.contrat.numero}` : 'Aperçu du contrat'}
+        description={
+          apercu
+            ? `${apercu.contrat.locataire?.nom ?? 'Locataire'} · ${formaterDate(
+                apercu.contrat.dateDebut,
+              )} → ${formaterDate(apercu.contrat.dateFin)}`
+            : undefined
+        }
+        onFermer={() => setApercu(null)}
+        taille="xl"
+        pied={
+          <>
+            <button
+              type="button"
+              className="btn btn-ghost"
+              onClick={() => setApercu(null)}
+            >
+              Fermer
+            </button>
+            <button
+              type="button"
+              className="btn btn-primary gap-2"
+              disabled={!apercu || apercuEnTelechargement}
+              onClick={() => apercu && void telechargerPdf(apercu.contrat)}
+            >
+              <Download size={16} />
+              {apercuEnTelechargement ? 'Téléchargement…' : 'Télécharger le PDF'}
+            </button>
+          </>
+        }
+      >
+        {apercu && (
+          <div className="space-y-3">
+            <div className="flex flex-wrap items-center gap-2 rounded-xl bg-base-200/60 px-4 py-3 text-xs text-base-content/70">
+              <FileText size={14} className="text-primary" />
+              <span>Contrat de location · PDF ·</span>
+              <span className="font-medium text-base-content">
+                {apercu.contrat.statut === 'ACTIF' ? 'Bail actif' : apercu.contrat.statut}
+              </span>
+              <span>·</span>
+              <span>
+                {apercu.contrat.appartement?.numero
+                  ? `Appartement ${apercu.contrat.appartement.numero}`
+                  : 'Logement non renseigné'}
+              </span>
+            </div>
+            <iframe
+              title={`Aperçu du contrat ${apercu.contrat.numero}`}
+              src={apercu.url}
+              className="h-[65vh] w-full rounded-xl border border-base-300 bg-base-200"
+            />
+          </div>
+        )}
       </Modale>
     </div>
   );

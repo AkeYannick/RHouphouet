@@ -22,6 +22,10 @@ class ContratViewModel extends ChangeNotifier {
   String? get errorMessage => _errorMessage;
   bool get sessionExpiree => _sessionExpiree;
 
+  Future<List<int>> telechargerPdf() {
+    return _repository.telechargerContratPdf();
+  }
+
   Future<void> charger() async {
     _isLoading = true;
     notifyListeners();

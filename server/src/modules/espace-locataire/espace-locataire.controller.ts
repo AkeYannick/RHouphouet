@@ -6,6 +6,7 @@ import {
   HttpCode,
   Post,
   Req,
+  StreamableFile,
   UseGuards,
 } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
@@ -90,6 +91,19 @@ export class EspaceLocataireController {
   @Get('contrat')
   contrat(@Req() requete: RequeteLocataire) {
     return this.service.contratActif(identifiant(requete));
+  }
+
+  @Get('contrat/pdf')
+  async contratPdf(@Req() requete: RequeteLocataire): Promise<StreamableFile> {
+    const { contenu, nomFichier } = await this.service.contratActifPdf(
+      identifiant(requete),
+    );
+
+    return new StreamableFile(contenu, {
+      type: 'application/pdf',
+      disposition: `attachment; filename="${nomFichier}"`,
+      length: contenu.length,
+    });
   }
 
   @Get('messages')
