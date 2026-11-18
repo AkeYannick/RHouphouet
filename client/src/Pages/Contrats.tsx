@@ -260,7 +260,6 @@ const Contrats = () => {
       dateFin: formulaire.dateFin || undefined,
       loyerMensuel: loyer,
       caution,
-      chargesMensuelles: charges,
       statut: formulaire.statut,
       clauses: formulaire.clauses.trim() || undefined,
     };
@@ -672,20 +671,7 @@ const Contrats = () => {
             />
           </Champ>
 
-          <Champ libelle="Charges mensuelles (FCFA)">
-            <input
-              type="number"
-              min={0}
-              className="input input-bordered w-full"
-              value={formulaire.chargesMensuelles}
-              onChange={(evenement) =>
-                setFormulaire({
-                  ...formulaire,
-                  chargesMensuelles: evenement.target.value,
-                })
-              }
-            />
-          </Champ>
+          
 
           <div className="sm:col-span-2">
             <Champ libelle="Clauses particulières (optionnel)">
