@@ -37,7 +37,6 @@ interface FormulaireContrat {
   dateFin: string;
   loyerMensuel: string;
   caution: string;
-  chargesMensuelles: string;
   statut: StatutContrat;
   clauses: string;
 }
@@ -50,7 +49,6 @@ function formulaireVide(): FormulaireContrat {
     dateFin: '',
     loyerMensuel: '',
     caution: '',
-    chargesMensuelles: '0',
     statut: 'ACTIF',
     clauses: '',
   };
@@ -232,14 +230,9 @@ const Contrats = () => {
     }
 
     const caution = formulaire.caution ? Number(formulaire.caution) : undefined;
-    const charges = formulaire.chargesMensuelles ? Number(formulaire.chargesMensuelles) : 0;
 
-    if (
-      (caution !== undefined && (!Number.isFinite(caution) || caution < 0)) ||
-      !Number.isFinite(charges) ||
-      charges < 0
-    ) {
-      setErreurFormulaire('La caution et les charges doivent être des montants positifs');
+    if (caution !== undefined && (!Number.isFinite(caution) || caution < 0)) {
+      setErreurFormulaire('La caution doit être un montant positif');
       return;
     }
 
@@ -430,7 +423,7 @@ const Contrats = () => {
                   <BadgeStatutContrat statut={contrat.statut} />
                 </div>
 
-                <div className="grid grid-cols-3 gap-2 rounded-xl bg-base-200/60 p-3 text-sm">
+                <div className="grid grid-cols-2 gap-2 rounded-xl bg-base-200/60 p-3 text-sm">
                   <div>
                     <p className="text-xs text-base-content/50">Loyer</p>
                     <p className="font-semibold">{formaterMontant(contrat.loyerMensuel)}</p>
@@ -438,12 +431,6 @@ const Contrats = () => {
                   <div>
                     <p className="text-xs text-base-content/50">Caution</p>
                     <p className="font-semibold">{formaterMontant(contrat.caution)}</p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-base-content/50">Charges</p>
-                    <p className="font-semibold">
-                      {formaterMontant(contrat.chargesMensuelles)}
-                    </p>
                   </div>
                 </div>
 
@@ -670,8 +657,6 @@ const Contrats = () => {
               }
             />
           </Champ>
-
-          
 
           <div className="sm:col-span-2">
             <Champ libelle="Clauses particulières (optionnel)">
