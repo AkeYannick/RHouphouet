@@ -63,6 +63,11 @@ const ONGLETS: Array<{ cle: FiltreStatut; libelle: string }> = [
   { cle: 'RESILIE', libelle: 'Résiliés' },
 ];
 
+/** Extrait un message lisible d'une erreur inconnue */
+function messageErreur(probleme: unknown): string {
+  return probleme instanceof Error ? probleme.message : 'Une erreur est survenue';
+}
+
 const Contrats = () => {
   const [contrats, setContrats] = useState<Contrat[]>([]);
   const [locataires, setLocataires] = useState<Locataire[]>([]);
@@ -72,32 +77,71 @@ const Contrats = () => {
   const [filtreStatut, setFiltreStatut] = useState<FiltreStatut>('TOUS');
   const { message, afficherMessage } = useMessageFlash();
 
+  const [chargementLocataires, setChargementLocataires] = useState(false);
+  const [erreurLocataires, setErreurLocataires] = useState<string | null>(null);
+
   const [modaleOuverte, setModaleOuverte] = useState(false);
   const [formulaire, setFormulaire] = useState<FormulaireContrat>(formulaireVide);
   const [erreurFormulaire, setErreurFormulaire] = useState<string | null>(null);
   const [enregistrement, setEnregistrement] = useState(false);
 
+  /**
+   * Chargement indépendant des trois listes : si l'une échoue,
+   * les deux autres s'affichent quand même.
+   */
   const charger = useCallback(async (silencieux = false) => {
     if (!silencieux) {
       setChargement(true);
     }
 
+    const [rContrats, rLocataires, rAppartements] = await Promise.allSettled([
+      api.contrats.lister(),
+      api.locataires.lister(),
+      api.appartements.lister(),
+    ]);
+
+    const erreurs: string[] = [];
+
+    if (rContrats.status === 'fulfilled') {
+      setContrats(rContrats.value);
+    } else {
+      erreurs.push(`Contrats : ${messageErreur(rContrats.reason)}`);
+    }
+
+    if (rLocataires.status === 'fulfilled') {
+      setLocataires(rLocataires.value);
+      setErreurLocataires(null);
+    } else {
+      const texte = messageErreur(rLocataires.reason);
+      setErreurLocataires(texte);
+      erreurs.push(`Locataires : ${texte}`);
+    }
+
+    if (rAppartements.status === 'fulfilled') {
+      setAppartements(rAppartements.value);
+    } else {
+      erreurs.push(`Appartements : ${messageErreur(rAppartements.reason)}`);
+    }
+
+    setErreur(erreurs.length > 0 ? erreurs.join(' · ') : null);
+
+    if (!silencieux) {
+      setChargement(false);
+    }
+  }, []);
+
+  /** Recharge uniquement les locataires (ouverture de la modale ou bouton « Réessayer ») */
+  const chargerLocataires = useCallback(async () => {
+    setChargementLocataires(true);
+
     try {
-      const [listeContrats, listeLocataires, listeAppartements] = await Promise.all([
-        api.contrats.lister(),
-        api.locataires.lister(),
-        api.appartements.lister(),
-      ]);
-      setContrats(listeContrats);
-      setLocataires(listeLocataires);
-      setAppartements(listeAppartements);
-      setErreur(null);
+      const liste = await api.locataires.lister();
+      setLocataires(liste);
+      setErreurLocataires(null);
     } catch (probleme) {
-      setErreur((probleme as Error).message);
+      setErreurLocataires(messageErreur(probleme));
     } finally {
-      if (!silencieux) {
-        setChargement(false);
-      }
+      setChargementLocataires(false);
     }
   }, []);
 
@@ -113,20 +157,41 @@ const Contrats = () => {
     [contrats, filtreStatut],
   );
 
-  const contratsActifs = contrats.filter((contrat) => contrat.statut === 'ACTIF');
+  const contratsActifs = useMemo(
+    () => contrats.filter((contrat) => contrat.statut === 'ACTIF'),
+    [contrats],
+  );
+
   const loyersMensuelsActifs = contratsActifs.reduce(
-    (total, contrat) => total + contrat.loyerMensuel,
+    (total, contrat) => total + (contrat.loyerMensuel ?? 0),
     0,
   );
   const cautionsActives = contratsActifs.reduce(
-    (total, contrat) => total + contrat.caution,
+    (total, contrat) => total + (contrat.caution ?? 0),
     0,
   );
+
+  /** Locataires qui ont déjà un contrat actif (pour éviter les doublons) */
+  const idsAvecContratActif = useMemo(() => {
+    const ids = new Set<string>();
+    for (const contrat of contratsActifs) {
+      if (contrat.locataire?.id) {
+        ids.add(contrat.locataire.id);
+      }
+    }
+    return ids;
+  }, [contratsActifs]);
 
   const ouvrirModale = () => {
     setFormulaire(formulaireVide());
     setErreurFormulaire(null);
     setModaleOuverte(true);
+    void chargerLocataires(); // liste toujours à jour à l'ouverture
+  };
+
+  const fermerModale = () => {
+    if (enregistrement) return; // pas de fermeture pendant l'enregistrement
+    setModaleOuverte(false);
   };
 
   const choisirLocataire = (locataireId: string) => {
@@ -135,16 +200,23 @@ const Contrats = () => {
       ...precedent,
       locataireId,
       appartementId: locataire?.appartementId ?? '',
-      loyerMensuel: locataire ? String(locataire.loyerMensuel) : '',
-      caution: locataire ? String(locataire.caution) : '',
+      loyerMensuel: locataire ? String(locataire.loyerMensuel ?? '') : '',
+      caution: locataire ? String(locataire.caution ?? '') : '',
     }));
   };
 
   const creer = async (evenement: FormEvent) => {
     evenement.preventDefault();
 
+    if (enregistrement) return; // évite le double envoi
+
     if (!formulaire.locataireId) {
       setErreurFormulaire('Veuillez sélectionner un locataire');
+      return;
+    }
+
+    if (!formulaire.dateDebut) {
+      setErreurFormulaire('La date de début est obligatoire');
       return;
     }
 
@@ -153,23 +225,48 @@ const Contrats = () => {
       return;
     }
 
+    const loyer = Number(formulaire.loyerMensuel);
+    if (!Number.isFinite(loyer) || loyer <= 0) {
+      setErreurFormulaire('Le loyer mensuel doit être supérieur à 0');
+      return;
+    }
+
+    const caution = formulaire.caution ? Number(formulaire.caution) : undefined;
+    const charges = formulaire.chargesMensuelles ? Number(formulaire.chargesMensuelles) : 0;
+
+    if (
+      (caution !== undefined && (!Number.isFinite(caution) || caution < 0)) ||
+      !Number.isFinite(charges) ||
+      charges < 0
+    ) {
+      setErreurFormulaire('La caution et les charges doivent être des montants positifs');
+      return;
+    }
+
+    if (
+      formulaire.statut === 'ACTIF' &&
+      idsAvecContratActif.has(formulaire.locataireId) &&
+      !window.confirm(
+        'Ce locataire a déjà un contrat actif. Créer quand même un nouveau contrat actif ?',
+      )
+    ) {
+      return;
+    }
+
     const donnees: DonneesContrat = {
       locataireId: formulaire.locataireId,
       appartementId: formulaire.appartementId || undefined,
-      dateDebut: formulaire.dateDebut || undefined,
+      dateDebut: formulaire.dateDebut,
       dateFin: formulaire.dateFin || undefined,
-      loyerMensuel: formulaire.loyerMensuel
-        ? Number(formulaire.loyerMensuel)
-        : undefined,
-      caution: formulaire.caution ? Number(formulaire.caution) : undefined,
-      chargesMensuelles: formulaire.chargesMensuelles
-        ? Number(formulaire.chargesMensuelles)
-        : 0,
+      loyerMensuel: loyer,
+      caution,
+      chargesMensuelles: charges,
       statut: formulaire.statut,
       clauses: formulaire.clauses.trim() || undefined,
     };
 
     setEnregistrement(true);
+    setErreurFormulaire(null);
 
     try {
       await api.contrats.creer(donnees);
@@ -177,7 +274,7 @@ const Contrats = () => {
       setModaleOuverte(false);
       await charger(true);
     } catch (probleme) {
-      setErreurFormulaire((probleme as Error).message);
+      setErreurFormulaire(messageErreur(probleme));
     } finally {
       setEnregistrement(false);
     }
@@ -199,7 +296,7 @@ const Contrats = () => {
       afficherMessage(`Contrat ${contrat.numero} mis à jour`);
       await charger(true);
     } catch (probleme) {
-      setErreur((probleme as Error).message);
+      setErreur(messageErreur(probleme));
     }
   };
 
@@ -219,7 +316,7 @@ const Contrats = () => {
       afficherMessage('Contrat supprimé');
       await charger(true);
     } catch (probleme) {
-      setErreur((probleme as Error).message);
+      setErreur(messageErreur(probleme));
     }
   };
 
@@ -299,7 +396,11 @@ const Contrats = () => {
           <EtatVide
             icone={FileText}
             titre="Aucun contrat trouvé"
-            description="Créez un contrat pour formaliser la location d'un logement."
+            description={
+              filtreStatut === 'TOUS'
+                ? "Créez un contrat pour formaliser la location d'un logement."
+                : 'Aucun contrat ne correspond à ce filtre.'
+            }
             action={
               <button type="button" onClick={ouvrirModale} className="btn btn-primary btn-sm">
                 Créer un contrat
@@ -421,14 +522,15 @@ const Contrats = () => {
         ouvert={modaleOuverte}
         titre="Créer un contrat de location"
         description="Les montants sont préremplis à partir de la fiche du locataire."
-        onFermer={() => setModaleOuverte(false)}
+        onFermer={fermerModale}
         taille="lg"
         pied={
           <>
             <button
               type="button"
               className="btn btn-ghost"
-              onClick={() => setModaleOuverte(false)}
+              onClick={fermerModale}
+              disabled={enregistrement}
             >
               Annuler
             </button>
@@ -436,7 +538,7 @@ const Contrats = () => {
               type="submit"
               form="formulaire-contrat"
               className="btn btn-primary"
-              disabled={enregistrement}
+              disabled={enregistrement || chargementLocataires}
             >
               {enregistrement ? 'Création…' : 'Créer le contrat'}
             </button>
@@ -454,16 +556,37 @@ const Contrats = () => {
                 className="select select-bordered w-full"
                 value={formulaire.locataireId}
                 onChange={(evenement) => choisirLocataire(evenement.target.value)}
+                disabled={chargementLocataires}
                 required
               >
-                <option value="">— Choisir un locataire —</option>
+                <option value="">
+                  {chargementLocataires
+                    ? 'Chargement des locataires…'
+                    : locataires.length === 0
+                      ? 'Aucun locataire disponible'
+                      : '— Choisir un locataire —'}
+                </option>
                 {locataires.map((locataire) => (
                   <option key={locataire.id} value={locataire.id}>
                     {locataire.appartement?.numero ?? 'Sans appartement'} — {locataire.nom}
+                    {idsAvecContratActif.has(locataire.id) ? ' (contrat actif)' : ''}
                   </option>
                 ))}
               </select>
             </Champ>
+
+            {erreurLocataires && (
+              <p className="mt-1 text-xs text-error">
+                Impossible de charger les locataires : {erreurLocataires}{' '}
+                <button
+                  type="button"
+                  className="link"
+                  onClick={() => void chargerLocataires()}
+                >
+                  Réessayer
+                </button>
+              </p>
+            )}
           </div>
 
           <Champ libelle="Appartement concerné">
@@ -517,6 +640,7 @@ const Contrats = () => {
               type="date"
               className="input input-bordered w-full"
               value={formulaire.dateFin}
+              min={formulaire.dateDebut || undefined}
               onChange={(evenement) =>
                 setFormulaire({ ...formulaire, dateFin: evenement.target.value })
               }
@@ -577,7 +701,9 @@ const Contrats = () => {
           </div>
 
           {erreurFormulaire && (
-            <p className="text-sm text-error sm:col-span-2">{erreurFormulaire}</p>
+            <p className="text-sm text-error sm:col-span-2" role="alert">
+              {erreurFormulaire}
+            </p>
           )}
         </form>
       </Modale>
